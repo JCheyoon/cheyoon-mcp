@@ -33,6 +33,25 @@ export function registerTools(server: McpServer): void {
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );
+  server.registerTool(
+    "search_posts",
+    {
+      description:
+        "Searches blog posts by exact substring (case-insensitive). No translation or transliteration. " +
+        "A term may be written in Korean or English in a post. If nothing is found, " +
+        "retry with the other language or spelling, or use list_posts to browse all posts.",
+      inputSchema: z.object({
+        query: z.string().min(1).max(100).describe("search query"),
+        lang: z.enum(["ko", "en"]).optional().describe("ko or en. If omitted, no language filter."),
+        limit: z.number().int().min(1).max(10).default(5).describe("maximum number of results to return"),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ query, lang, limit }) => {
+      const result = searchPosts(await loadPosts(), query, lang, limit);
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
 }
 
 export function listPosts(posts: Post[], filter: { lang?: Lang; category?: string }) {
@@ -59,4 +78,36 @@ export function getPost(posts: Post[], lang: Lang, slug: string): Post {
   const post = posts.find((p) => p.lang === lang && p.slug === slug);
   if (!post) throw new Error(`Post not found: ${lang}/${slug}`);
   return post;
+}
+
+export function searchPosts(posts: Post[], query: string, lang: Lang | undefined, limit: number) {
+  const lowerQuery = query.toLowerCase();
+  const matches = (text: string) => text.toLowerCase().includes(lowerQuery);
+
+  return posts
+    .filter((post) => {
+      if (lang && post.lang !== lang) return false;
+      return (
+        matches(post.title) || matches(post.description) || post.tags.some(matches) || matches(post.body)
+      );
+    })
+    .slice(0, limit)
+    .map((post) => ({
+      slug: post.slug,
+      lang: post.lang,
+      title: post.title,
+      url: post.url,
+      description: post.description,
+      snippet: makeSnippet(post, lowerQuery),
+    }));
+}
+
+const SNIPPET_CONTEXT = 60;
+
+function makeSnippet(post: Post, lowerQuery: string): string {
+  const at = post.body.toLowerCase().indexOf(lowerQuery);
+  if (at === -1) return post.body.slice(0, SNIPPET_CONTEXT * 2) + "...";
+  const start = Math.max(0, at - SNIPPET_CONTEXT);
+  const end = Math.min(post.body.length, at + lowerQuery.length + SNIPPET_CONTEXT);
+  return (start > 0 ? "..." : "") + post.body.slice(start, end) + (end < post.body.length ? "..." : "");
 }
