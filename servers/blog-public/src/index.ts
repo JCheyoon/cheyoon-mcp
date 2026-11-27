@@ -11,6 +11,13 @@ const MCP_PATH = "/mcp";
 // MCP 요청은 작은 JSON뿐이라 SDK 기본값(4 MiB)보다 훨씬 작게 잡는다.
 const MAX_BODY_BYTES = 64 * 1024;
 
+// SDK의 오류 메시지에는 요청 본문의 값이 섞일 수 있다. 메시지는 버리고 거절 사유 코드나 코드 위치만 남긴다.
+function logError(error: Error): void {
+  const reason = /^Rejected inbound request \(([a-z-]+)\)/.exec(error.message)?.[1];
+  const frames = error.stack?.split(error.message)[1]?.trim().split("\n");
+  console.error(JSON.stringify(reason ? { rejected: reason } : { error: error.name, at: frames }));
+}
+
 // 클라이언트마다 지원하는 MCP 버전이 달라서, 최신(2026-07-28) 방식과 initialize를 보내는
 // 이전(~2025-11-25) 방식을 모두 받는다. SDK 기본값(legacy: "stateless")이다.
 const handler = createMcpHandler(
@@ -19,9 +26,9 @@ const handler = createMcpHandler(
     registerTools(server);
     return server;
   },
-  { maxRequestBodySize: MAX_BODY_BYTES },
+  { maxRequestBodySize: MAX_BODY_BYTES, onerror: logError },
 );
-const nodeHandler = toNodeHandler(handler, { maxRequestBodySize: MAX_BODY_BYTES });
+const nodeHandler = toNodeHandler(handler, { maxRequestBodySize: MAX_BODY_BYTES, onerror: logError });
 
 // 브라우저가 아닌 MCP 클라이언트는 Origin을 보내지 않는다. Origin이 붙은 요청(브라우저)은 모두 막는다.
 const validateOrigin = originValidation([]);
