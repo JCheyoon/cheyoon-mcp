@@ -1,0 +1,35 @@
+---
+name: create-pr
+description: 현재 작업 브랜치의 PR 초안(한글 제목·설명)을 만들어 사용자에게 보여 주고, 사용자가 명시적으로 승인한 뒤에만 push하고 master 대상 PR을 연다. "PR 올려줘", "PR 만들어줘", "push하고 PR" 요청에 사용한다.
+---
+
+# PR 작성
+
+규칙(승인, AI 표시 금지, merge는 사용자)은 `CLAUDE.md`를 따른다. 이 스킬은 절차만 적는다.
+
+## 1. 사전 확인 (하나라도 실패하면 멈추고 보고한다)
+- 브랜치가 `master`가 아니다.
+- `git status`가 깨끗하다. 커밋하지 않은 변경이 있으면 멈추고 사용자에게 묻는다.
+- 새 PR을 열기 전에, 열려 있는 PR에 합칠 수 있는지 확인한다(`gh pr list`). 합칠 수 있으면 그렇게 제안한다.
+- `git fetch origin` 뒤 `git log origin/master..HEAD`에 커밋이 있다.
+- AI 작성 표시가 없다: `git log origin/master..HEAD --format=%B | grep -iE 'co-authored-by: *claude|generated with'`
+
+## 2. 검증
+- 변경 파일: `git diff --name-only origin/master...HEAD`
+- `servers/<서버>/` 아래 코드나 설정이 바뀌었으면 그 폴더에서 `npm run build`(테스트가 있으면 테스트도)를 실행한다. 문서만 바뀌었으면 생략하고 PR에 그렇게 적는다.
+- 실패하면 PR을 열지 않고 보고한다.
+
+## 3. 초안
+- 제목과 본문은 한글로 쓴다. 코드 식별자, 경로, 명령어는 원문 그대로 둔다.
+- 제목: 한 줄, 50자 안팎, `<범위>: <무엇을 했는지>`.
+- 본문: 요약, 변경 내용 표(`git log --reverse origin/master..HEAD`와 `git show --stat <커밋>`을 보고 커밋마다 한 줄), 검증(실행한 명령과 결과), 확인하지 못한 것.
+- 실행하지 않은 검증을 "통과"라고 쓰지 않는다.
+
+## 4. 사용자 확인 (생략 불가)
+브랜치 → base, 커밋 목록, 변경 파일 목록, 제목과 본문 전문, 실행할 명령을 보여 주고 **여기서 멈춘다.** 같은 응답에서 push하지 않는다. 사용자가 명시적으로 승인하면 5단계로 간다. 고쳐 달라고 하면 반영해 다시 보여 준다.
+
+## 5. push와 PR (승인 후에만)
+1. `git push -u origin <브랜치>` (force push 금지)
+2. 본문을 임시 파일에 저장한다.
+3. 열린 PR이 없으면 `gh pr create --base master --head <브랜치> --title "<제목>" --body-file <파일>`, 있으면 `gh pr edit <번호> --title "<제목>" --body-file <파일>`
+4. PR URL과 merge 전에 사용자가 확인할 것을 알린다.
