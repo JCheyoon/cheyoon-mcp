@@ -8,10 +8,18 @@
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "format": "prettier --write src",
+    "test": "tsc && node --test dist/*.test.js"
   },
   "devDependencies": {
     "@types/node": "24.19.4",
+    "prettier": "^3.10.1",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "zod": "^4.6.7"
   }
 }
